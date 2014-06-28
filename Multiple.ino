@@ -1,6 +1,12 @@
 #include <OneWire.h>
 #include <DallasTemperature.h>
+#include <SD.h>
 
+long previousMillis = 0;        // will store last time LED was updated
+long interval = 5000;           // interval at which to blink (milliseconds)
+
+
+const int chipSelect = 10;
 // Data wire is plugged into port 2 on the Arduino
 #define ONE_WIRE_BUS 2
 #define TEMPERATURE_PRECISION 9
@@ -109,6 +115,21 @@ void setup(void)
        if (isSensorAddressmatch(sensorAddress[j], SensorFactoryAddress[i])) sensorID[i].factory_id = j;
       }
   }
+  
+  
+  
+  Serial.print("Initializing SD card...");
+  // make sure that the default chip select pin is set to
+  // output, even if you don't use it:
+  pinMode(10, OUTPUT);
+  
+  // see if the card is present and can be initialized:
+  if (!SD.begin(chipSelect)) {
+    Serial.println("Card failed, or not present");
+    // don't do anything more:
+    return;
+  }
+  Serial.println("card initialized.");
 
 }
 
@@ -178,7 +199,17 @@ bool isSensorAddressmatch(DeviceAddress deviceAddress, DeviceAddress fixedSensor
 
 void loop(void)
 { 
-  // call sensors.requestTemperatures() to issue a global temperature 
+
+    
+    unsigned long currentMillis = millis();
+ 
+  if(currentMillis - previousMillis > interval) {
+    // save the last time you blinked the LED 
+    previousMillis = currentMillis;   
+    
+    //interval start
+    
+      // call sensors.requestTemperatures() to issue a global temperature 
   // request to all devices on the bus
  // Serial.print("Requesting temperatures...");
   sensors.requestTemperatures();
@@ -206,6 +237,15 @@ if (testPrintAddress(sensorAddress[0], 0)){
     }
  */
  
+   String dataString = "";
+
+  // open the file. note that only one file can be open at a time,
+  // so you have to close this one before opening another.
+  File dataFile = SD.open("datalog.txt", FILE_WRITE);
+
+  
+  
+ 
     for (uint8_t k = 0; k < 10; k++)
     {
       int factory_id = sensorID[k].factory_id;
@@ -214,13 +254,54 @@ if (testPrintAddress(sensorAddress[0], 0)){
       //Serial.print(" id:" );   
       //Serial.print(sensorID[k].id);
       //Serial.print(" C:" );     
-      Serial.print(tempC);
       
-      if (k != 9) Serial.print(",");
+      dataString += String(parti(tempC));
+      dataString += ".";
+      dataString += String(partf(tempC,2));
+      
+     // Serial.print(tempC);
+      
+       //if (k != 9) Serial.print(",");
+       if (k != 9) dataString += ",";
 
     }
-      Serial.println();
+    
+    Serial.println();
+    
+    Serial.println(dataString);
+    
+    
+  // if the file is available, write to it:
+  if (dataFile) {
+    dataFile.println(dataString);
+    dataFile.close();
+  }  
+  // if the file isn't open, pop up an error:
+  else {
+    Serial.println("error opening datalog.txt");
+  } 
+    
+    //intervals stop
+
+  }
+
+}
 
 
+int parti(float x)
+{
+  return (int)x;
+}
+
+int partf(float x, int m)
+{
+  int i = parti(x);
+  while (m > 0)
+  {
+    i *= 10;
+    x *= 10;
+    m--;
+  }
+  return x - i;
 }
 
